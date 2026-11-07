@@ -170,8 +170,10 @@ $('erase-eeprom').onclick = () => { if (confirm('清空本浏览器保存的 256
 $('set-rtc').onclick = () => post('rtc', { value: new Date().toISOString() });
 $('set-breakpoint').onclick = () => { const value = $('breakpoint').value.trim(); if (!/^[0-9a-f]{1,4}$/i.test(value) || parseInt(value, 16) >= 0xf000) { alertMessage('请输入 0000～EFFF 之间的十六进制地址。'); return; } post('breakpoint', { address: parseInt(value, 16) }); $('breakpoint-state').textContent = '断点：' + value.toUpperCase().padStart(4, '0') + 'H；到达后暂停'; };
 $('clear-breakpoint').onclick = () => { post('breakpoint', { address: null }); $('breakpoint-state').textContent = '未设置断点'; };
-$('help').onclick = () => $('help-dialog').showModal(); $('diagnostics-button').onclick = () => $('diagnostics-dialog').showModal();
+$('help').onclick = () => $('help-dialog').showModal(); $('about-button').onclick = () => $('about-dialog').showModal(); $('diagnostics-button').onclick = () => $('diagnostics-dialog').showModal();
 document.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => b.closest('dialog').close(); });
+// 点击弹窗外的遮罩关闭
+document.querySelectorAll('dialog').forEach(d => { d.addEventListener('click', e => { if (e.target === d) d.close(); }); });
 let dragDepth = 0;
 addEventListener('dragenter', e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); dragDepth++; $('drop-zone').hidden = false; } });
 addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('Files')) e.preventDefault(); });

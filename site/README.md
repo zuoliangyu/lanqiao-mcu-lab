@@ -90,3 +90,7 @@ node tests/firmware.mjs "全模块测试例程目录" "大模板HEX文件完整�
 ```
 
 测试直接加载你自己的文件，交付包不包含它们。验证详情、固件SHA256与未验证项见 [VALIDATION.md](VALIDATION.md)。运行时无第三方依赖，参考资料见 [THIRD_PARTY.md](THIRD_PARTY.md)。新实现使用 MIT 许可证。
+
+## 作者
+
+左岚 · [哔哩哔哩](https://space.bilibili.com/27619688) · 姊妹项目：[蓝桥杯嵌入式在线实验台](https://github.com/zuoliangyu/lanqiao-embedded-lab)
