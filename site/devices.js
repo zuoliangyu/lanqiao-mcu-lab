@@ -152,7 +152,7 @@ export class DS18B20 {
   resetBus() { this.level = 1; this.fall = 0; this.presenceStart = -1; this.presenceEnd = -1; this.lowUntil = -1; this.phase = 'rom'; this.bits = 0; this.byte = 0; this.out = []; this.index = 0; }
   tick(now) {
     if (this.busyUntil && now >= this.busyUntil) {
-      const shift = 3 - ((this.scratch[4] >> 5) & 3), raw = Math.round(this.target * 16) & (0xffff << shift);
+      const shift = 3 - ((this.scratch[4] >> 5) & 3), raw = Math.round(this.board.inputs.temperature * 16) & (0xffff << shift);
       this.scratch[0] = raw & 255; this.scratch[1] = (raw >> 8) & 255; this.busyUntil = 0; this.conversions++;
     }
   }
@@ -172,7 +172,6 @@ export class DS18B20 {
           this.board.warn(this.board.inputs.temperaturePolicy === 'hold' ? '温度使用兼容策略：转换忙时忽略重复的 44H 命令。该重触发行为未经实物核对。' : 'DS18B20 尚未转换完成又收到 44H；本模型重新计时。若读数持续为 85°C，请检查转换间隔，或选择忙时保持的兼容策略。');
           if (this.board.inputs.temperaturePolicy === 'hold') { this.phase = 'poll'; return; }
         }
-        this.target = this.board.inputs.temperature;
         this.busyUntil = now + 93750 * 2 ** ((this.scratch[4] >> 5) & 3); this.phase = 'poll';
       } else if (v === 0xbe) {
         this.tick(now); this.scratch[8] = crc8(this.scratch.slice(0, 8)); this.queue([...this.scratch]); this.reads++;
@@ -196,7 +195,8 @@ export class DS18B20 {
         this.phase = 'rom'; this.out = []; this.bits = 0; this.byte = 0; this.lowUntil = -1;
         this.presenceStart = now + 15; this.presenceEnd = now + 240;
       } else if (!this.slotRead) {
-        this.byte |= (duration < 15 ? 1 : 0) << this.bits;
+        // Samples at the typical ~30us point of the 15–60us window, so an ISR-stretched write-1 still reads 1.
+        this.byte |= (duration < 30 ? 1 : 0) << this.bits;
         if (++this.bits === 8) { this.accept(this.byte, now); this.bits = 0; this.byte = 0; }
       }
     }

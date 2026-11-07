@@ -49,6 +49,9 @@ check('STC Timer0 模式0自动重装，12T / 1T',()=>{
 check('Timer0 外部计数与 PCA 溢出',()=>{
   const m=program([0x80,0xfe],{inputs:{frequencyEnabled:true,frequency:1234}});m.cpu.write(0x89,5);m.cpu.write(0x88,0x10);run(m,1000000);
   assert.equal(m.cpu.sfr[0x8a]|m.cpu.sfr[0x8c]<<8,1234);m.cpu.write(0xd8,0x40);run(m,65536);assert.ok(m.cpu.sfr[0xd8]&128);
+  // TMOD=05H，TR0=1，R7=100：CLR P3.4／SETB P3.4 循环，程序自己拉低引脚的下降沿同样计数
+  const loop=[0x75,0x89,0x05,0xd2,0x8c,0x7f,0x64,0xc2,0xb4,0,0,0xd2,0xb4,0,0,0xdf,0xf6,0x80,0xfe];
+  for(const frequencyEnabled of [false,true]){const t=program(loop,{inputs:{frequencyEnabled,frequency:100}});run(t,2000);assert.equal(t.cpu.sfr[0x8a],100);}
 });
 check('中断保存返回地址、定时扫描与演示按键实际执行',()=>{
   const m=new Machine();m.load(demoHex());run(m,100000);assert.equal(display(m),'2026  51');assert.ok(m.irqCounts[1]>100);
@@ -79,13 +82,21 @@ check('I²C EEPROM 通过引脚写入、忙时 NACK、页回卷、随机读',()=
 check('DS1302 时钟进位、停止位与写保护',()=>{
   const m=program([0x80,0xfe]), r=m.rtc;r.reg.set([0x59,0x59,0x23,0x28,2,6,0x26,0x80]);r.tick(1000000);assert.equal(r.display(1000000),'2026-03-01 00:00:00');r.addr=0;r.writeByte(0x30,1000000);assert.equal(r.reg[0],0);r.reg[0]|=128;r.tick(10000000);assert.equal(r.reg[0],128);
 });
-check('DS18B20 原始时隙、750ms 转换、负温度与 CRC',()=>{
+check('DS18B20 原始时隙、750ms 转换结束时采样、负温度与 CRC',()=>{
   const m=program([0x80,0xfe]);const d=m.temp;let t=0;
   const reset=()=>{d.update(0,t);t+=500;d.update(1,t);t+=30;assert.equal(d.read(t),0);t+=400;};
   const write=b=>{for(let i=0;i<8;i++){d.update(0,t);t+=(b>>i&1)?2:60;d.update(1,t);t+=(b>>i&1)?68:10;}};
   const read=()=>{let b=0;for(let i=0;i<8;i++){d.update(0,t);t+=2;d.update(1,t);t+=10;b|=d.read(t)<<i;t+=58;}return b;};
-  m.inputs.temperature=-10.5;reset();write(0xcc);write(0x44);assert.equal(d.scratch[0],0x50);t+=750000;d.tick(t);
+  m.inputs.temperature=30;reset();write(0xcc);write(0x44);m.inputs.temperature=-10.5;assert.equal(d.scratch[0],0x50);t+=750000;d.tick(t);
   reset();write(0xcc);write(0xbe);assert.equal(read(),0x58);assert.equal(read(),0xff);
+  // 写 1 的低电平被中断拉长到 25µs 仍在典型采样点之前
+  const slow=b=>{for(let i=0;i<8;i++){d.update(0,t);t+=(b>>i&1)?25:60;d.update(1,t);t+=(b>>i&1)?45:10;}};
+  reset();slow(0xcc);slow(0xbe);assert.equal(read(),0x58);
+});
+check('超声波板载40kHz脉冲串：容忍个别被中断拉长的半周期，单脉冲不触发',()=>{
+  const burst=(widths)=>{const m=program([0x80,0xfe]);const set=(v,us)=>{m.cpu.cycles+=Math.round(us*12);m.cpu.write(0x90,v);};set(0xfe,1000);for(const w of widths){set(0xff,14);set(0xfe,w);}return m.pings;};
+  assert.equal(burst(Array(8).fill(12.5)),1);assert.equal(burst([12.5,12.5,12.5,26,12.5,12.5,12.5,12.5]),1);
+  assert.equal(burst([12.5]),0);assert.equal(burst([12.5,12.5,12.5,80,12.5,12.5,12.5,12.5]),0);
 });
 check('EEPROM 复位／断电保留，RTC 仅断电重置',()=>{
   const m=program([0x80,0xfe]);m.i2c.memory[3]=42;m.rtc.reg[2]=0x21;m.reset();assert.equal(m.i2c.memory[3],42);assert.equal(m.rtc.hour(),21);m.reset(true);assert.equal(m.i2c.memory[3],42);assert.equal(m.rtc.hour(),12);

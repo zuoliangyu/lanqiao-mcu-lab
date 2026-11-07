@@ -20,7 +20,7 @@ export class Machine {
     this.i2c.resetBus(); this.i2c.busyUntil = busy; this.rtc.resetBus(); this.rtc.last = 0;
     this.temp.resetBus(); this.temp.busyUntil = conversion;
     if (power) { this.i2c.pending = []; this.i2c.busyUntil = 0; this.rtc = new DS1302(); this.temp = new DS18B20(this); }
-    this.reload = [0, 0, 0]; this.frac = [0, 0, 0]; this.pcaFrac = 0;
+    this.reload = [0, 0, 0]; this.frac = [0, 0, 0]; this.pcaFrac = 0; this.t0Edges = 0;
     this.irqCounts = Array(13).fill(0); this.overflowCounts = [0, 0, 0]; this.timer2Pending = false;
     this.latch = power || !this.latch ? [255, 0, 0, 255] : [...this.latch]; this.latch[3] = 255;
     this.segEnergy = new Float64Array(64); this.ledEnergy = new Float64Array(8);
@@ -38,7 +38,7 @@ export class Machine {
       if (value) this.inputs.keys = this.inputs.keys.filter(k => k < 16);
     }
     else if (name === 'analog') this.inputs.analog = value.map(v => Math.max(0, Math.min(5, Number(v) || 0)));
-    else if (name === 'temperature') this.inputs.temperature = Math.max(-55, Math.min(125, Number(value) || 0));
+    else if (name === 'temperature') { this.temp.tick(this.now); this.inputs.temperature = Math.max(-55, Math.min(125, Number(value) || 0)); }
     else if (name === 'frequency') this.inputs.frequency = Math.max(100, Math.min(38000, Number(value) || 100));
     else if (name === 'distance') this.inputs.distance = Math.max(2, Math.min(1000, Number(value) || 2));
     else if (Object.hasOwn(this.inputs, name)) this.inputs[name] = value;
@@ -56,6 +56,8 @@ export class Machine {
     for (let i = 0; i < 8; i++) for (const [a, b] of edges) if (!nodes[a] || !nodes[b]) nodes[a] = nodes[b] = 0;
     return nodes;
   }
+  // P3.4/T0 pin: the MCU pulling low wins over the 555 output.
+  t0Pin(now) { return this.pinDrive(3, 4) && !(this.inputs.frequencyEnabled && this.inputs.frequency > 0 && Math.floor(now * this.inputs.frequency * 2 / 1e6) % 2); }
   readPort(p) {
     let value = 0; for (let b = 0; b < 8; b++) value |= this.pinDrive(p, b) << b;
     const now = this.now;
@@ -91,6 +93,10 @@ export class Machine {
       this.txByte = v; this.txDue = now + 10e6 / (this.baud() || 9600);
     }
     if (a === 0x80 || a === 0xa0 || a === 0xc0) this.updateLatches();
+    if ((a === 0xb0 || a === 0xb1 || a === 0xb2) && (s[0x88] & 16) && (s[0x89] & 4)) {
+      const value = s[a]; s[a] = old; const before = this.t0Pin(now); s[a] = value;
+      if (before && !this.t0Pin(now)) this.t0Edges++;
+    }
     if (a === 0xa0 || a === 0x90) {
       this.i2c.update(this.pinDrive(2, 0), this.pinDrive(2, 1), now);
       this.rtc.update(this.pinDrive(1, 3), this.pinDrive(1, 7), this.pinDrive(2, 3), now);
@@ -103,7 +109,8 @@ export class Machine {
           if (this.inputs.ultrasonicMode === 'pulse' && pulse >= 8 && pulse <= 100) this.ping(now);
           if (this.inputs.ultrasonicMode === 'board') {
             if (this.burstStart < 0 || now - this.burstLast > 100) { this.burstEdges = 0; this.burstStart = this.txStart; }
-            if (pulse >= 5 && pulse <= 25) this.burstEdges++; else this.burstEdges = 0;
+            // The 40 kHz transducer is high-Q: an ISR stretching one half-cycle (up to 2 periods) still transmits.
+            if (pulse >= 5 && pulse <= 50) this.burstEdges++; else this.burstEdges = 0;
             if (this.burstEdges === 8) { this.ping(now); this.burstEdges = 0; }
             this.burstLast = now;
           }
@@ -169,6 +176,7 @@ export class Machine {
       let inc;
       if (mode & 4) {
         inc = i === 0 && this.inputs.frequencyEnabled && this.pinDrive(3, 4) ? Math.floor(now * this.inputs.frequency / 1e6 + 0.5) - Math.floor(before * this.inputs.frequency / 1e6 + 0.5) : 0;
+        if (i === 0) { inc += this.t0Edges; this.t0Edges = 0; }
       } else {
         const div = (s[0x8e] & (128 >> i)) ? 1 : 12;
         this.frac[i] += clocks; inc = Math.floor(this.frac[i] / div); this.frac[i] %= div;
