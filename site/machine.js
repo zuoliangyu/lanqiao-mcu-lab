@@ -27,7 +27,7 @@ export class Machine {
     this.displayLast = 0; this.frameLast = 0; this.lastSegments = Array(64).fill(0); this.lastLeds = Array(8).fill(0);
     this.latchWrites = [0, 0, 0, 0]; this.tx = []; this.txByte = null; this.txDue = Infinity; this.rxQueue = []; this.rxDue = Infinity; this.rx = 0; this.txCount = 0; this.rxCount = 0;
     this.diagnostics = []; this.warned = new Set(); this.echoAt = Infinity; this.echoUntil = -1; this.lastTx = 1; this.txStart = 0; this.burstStart = -1; this.burstEdges = 0; this.pings = 0;
-    this.inputs.keys = []; this.lastP3 = 255; this.breakpoints = new Set();
+    this.inputs.keys = []; this.lastP3 = 255; this.breakpoints = new Set(); this.inputQueue = []; this.slices = [];
   }
   load(text) { const info = parseHex(text); this.reset(true); this.cpu.code.set(info.code); this.codeInfo = { count: info.count, max: info.max }; return this.codeInfo; }
   warn(message) { if (!this.warned.has(message)) { this.warned.add(message); this.diagnostics.push(message); } }
@@ -42,6 +42,28 @@ export class Machine {
     else if (name === 'frequency') this.inputs.frequency = Math.max(100, Math.min(38000, Number(value) || 100));
     else if (name === 'distance') this.inputs.distance = Math.max(2, Math.min(1000, Number(value) || 2));
     else if (Object.hasOwn(this.inputs, name)) this.inputs[name] = value;
+  }
+  // Inputs applied at an exact simulated time (us), between instructions.
+  queueInput(name, value, at) {
+    let i = this.inputQueue.length; while (i && this.inputQueue[i - 1].at > at) i--;
+    this.inputQueue.splice(i, 0, { name, value, at });
+  }
+  flushInputs(until = Infinity) { while (this.inputQueue.length && this.inputQueue[0].at <= until) { const { name, value } = this.inputQueue.shift(); this.setInput(name, value); } }
+  // Wall-clock marks (ms) around each run slice, so page events can be placed at the simulated time they happened.
+  markSlice(wallStart, simStart, wallEnd) { this.slices.push([wallStart, simStart, wallEnd, this.now]); if (this.slices.length > 128) this.slices.splice(0, 64); }
+  simAt(wall) {
+    for (let i = this.slices.length - 1; i >= 0; i--) {
+      const [w0, s0, w1, s1] = this.slices[i];
+      if (wall >= w1) return s1;
+      if (wall >= w0) return s0 + (s1 - s0) * (wall - w0) / Math.max(1e-6, w1 - w0);
+    }
+    return this.slices.length ? this.slices[0][1] : this.now;
+  }
+  // Events reach the worker only between slices, so they run one slice length (lead) late: press length and spacing
+  // match the simulated time that actually passed, and a release is never already in the past.
+  queueKeys(value, wall, lead) {
+    const last = this.inputQueue.at(-1)?.at ?? 0, at = Math.max(this.simAt(wall) + lead, this.now, last);
+    this.queueInput('keys', value, at); return at;
   }
   pinDrive(port, bit) {
     const s = this.cpu.sfr, [m1, m0] = MODE[port];
@@ -244,6 +266,7 @@ export class Machine {
   runUs(us, maxInstructions = 5000000) {
     const target = this.cpu.cycles + us * this.hz / 1e6; let done = 0;
     while (this.cpu.cycles < target && done++ < maxInstructions) {
+      if (this.inputQueue.length && this.inputQueue[0].at <= this.now) this.flushInputs(this.now);
       if (this.breakpoints.has(this.cpu.pc)) return 'breakpoint';
       if (this.cpu.pc >= 0xf000) throw new Error(`PC 超出 60 KB 程序空间：${this.cpu.pc.toString(16)}`);
       this.cpu.step();

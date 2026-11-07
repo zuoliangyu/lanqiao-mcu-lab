@@ -57,6 +57,17 @@ check('中断保存返回地址、定时扫描与演示按键实际执行',()=>{
   const m=new Machine();m.load(demoHex());run(m,100000);assert.equal(display(m),'2026  51');assert.ok(m.irqCounts[1]>100);
   m.setInput('keys',[4]);run(m,50000);assert.equal(m.latch[0]&8,0);m.setInput('keys',[]);run(m,30000);assert.equal(m.latch[0]&8,8);
 });
+check('按键事件按页面时间戳换算到仿真时刻：按住时长与电脑快慢无关，事件不落到过去也不乱序',()=>{
+  const m=new Machine();m.load(demoHex());run(m,100000);let on=-1,off=-1;
+  const watch=n=>{for(let i=0;i<n;i++){m.runUs(1000);if(on<0&&!(m.latch[0]&8))on=m.now;if(on>=0&&off<0&&m.latch[0]&8)off=m.now;}};
+  // 模拟 worker：每片16ms仿真；第一片用8ms墙钟（快电脑），第二片用64ms（慢电脑，0.25×）。事件在片间送达
+  const s0=m.now;run(m,16000);m.markSlice(1000,s0,1008);const a=m.queueKeys([4],1004,16000);assert.equal(a,s0+8000+16000);
+  const s1=m.now;watch(16);m.markSlice(1016,s1,1080);const b=m.queueKeys([],1048,16000);assert.equal(b,s1+8000+16000);watch(60);
+  assert.ok(on>=a&&on<=a+2000);assert.ok(off>=b&&off<=b+2000);assert.equal(m.inputQueue.length,0);
+  // 落在过去的事件推迟到当前；后来的事件不能排到尚未生效的事件前面
+  const c=m.queueKeys([5],0,16000);assert.equal(c,m.now);const d=m.queueKeys([6],5000,16000),e=m.queueKeys([],0,16000);assert.ok(e>=d);
+  m.flushInputs();assert.deepEqual(m.inputs.keys,[]);
+});
 check('UART1 Timer2 波特率、发送完成延时与接收中断标志',()=>{
   const m=program([0x80,0xfe]); m.cpu.write(0x98,0x50); m.cpu.write(0xd7,0xe6);m.cpu.write(0xd6,0xff);m.cpu.write(0x8e,0x11);
   assert.ok(Math.abs(m.baud()-9600)<30);m.cpu.write(0x99,65);run(m,500);assert.equal(m.cpu.sfr[0x98]&2,0);run(m,600);assert.equal(m.tx[0],65);assert.ok(m.cpu.sfr[0x98]&2);

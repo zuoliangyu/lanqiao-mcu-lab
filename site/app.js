@@ -27,7 +27,7 @@ function keysUpdate() {
     el.title = frequencyConflict ? 'P3.4 已用于频率输入，请先断开频率输入' : '';
     if (el.disabled) { held.delete(k); locked.delete(k); }
   }
-  const keys = [...new Set([...held, ...locked])]; post('input', { name: 'keys', value: keys });
+  const keys = [...new Set([...held, ...locked])]; post('input', { name: 'keys', value: keys, wall: performance.timeOrigin + performance.now() });
   for (const el of $('keys').children) { const k = Number(el.dataset.key); el.classList.toggle('pressed', keys.includes(k)); el.classList.toggle('locked', locked.has(k)); el.setAttribute('aria-pressed', String(keys.includes(k))); }
 }
 for (let row = 0; row < 4; row++) for (let col = 0; col < 4; col++) {
