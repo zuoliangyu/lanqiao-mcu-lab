@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#16877f"><title>蓝桥杯单片机在线实验台 · STC15</title><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-icon">51</span><div><h1>蓝桥杯单片机在线实验台</h1><p>CT107D · STC15F2K60S2</p></div></div>
+  <div class="toolbar" aria-label="仿真控制"><button id="choose" class="primary">载入 HEX ↑</button><input id="file" type="file" accept=".hex,.ihx" hidden><button id="run" disabled>▶ 运行</button><button id="pause" disabled>暂停</button><button id="reset" disabled>复位</button><button id="power" disabled title="保留 EEPROM，重新初始化其他器件">断电重启</button></div>
+  <div class="settings"><label for="hz">主频</label><select id="hz"><option value="12000000">12 MHz</option><option value="11059200">11.0592 MHz</option><option value="24000000">24 MHz</option><option value="33000000">33 MHz</option></select><label for="speed">倍率</label><select id="speed"><option value="0.25">0.25×</option><option selected value="1">1×</option><option value="4">4×</option></select><span id="status" class="status">等待程序</span></div>
+  <button id="help" class="text-button">使用说明</button>
+</header>
+<div id="alert" class="alert" role="alert" hidden><span id="alert-text"></span><button id="dismiss" aria-label="关闭提示">×</button></div>
+<main class="layout">
+  <div class="column display-column">
+    <section class="card display-card">
+      <div class="card-title"><h2>数码管</h2><span>8 位共阳 · 动态扫描</span></div>
+      <div class="display-area"><div id="digits" class="digits" aria-label="数码管显示"></div><div class="digit-labels"><span>DS1</span><span>DS2</span></div></div>
+      <div id="empty" class="empty-state"><span class="file-badge">HEX</span><div><strong>准备好你的程序</strong><p>拖入 Keil 生成的 HEX，或先试试内置演示</p></div><button id="demo" class="small-button">运行演示 ↗</button></div>
+      <div class="display-note"><i></i><span id="display-note">显示内容来自程序对 P0 / P2 的实际写入</span></div>
+    </section>
+    <section class="card firmware-card">
+      <div class="file-row"><span class="file-badge">51</span><div><h3 id="filename">尚未载入程序</h3><p id="fileinfo">文件仅在浏览器内读取，不上传</p></div><button id="demo-again" class="text-button" title="载入内置基础演示">演示</button></div>
+      <div class="metrics"><div><span>仿真时间</span><strong id="sim-time">0.000 <small>s</small></strong></div><div><span>程序计数器</span><strong id="pc">0000<small>H</small></strong></div><div><span>实际倍率</span><strong id="rate">—</strong></div></div>
+    </section>
+    <section class="card serial-card">
+      <div class="card-title"><h2>串口终端 <small id="baud">UART1 未配置</small></h2><button id="clear-serial" class="text-button">清空</button></div>
+      <pre id="serial" aria-label="串口输出">等待 UART1 输出…</pre>
+      <form id="serial-form"><label for="serial-input" class="sr-only">串口发送内容</label><input id="serial-input" placeholder="输入发送内容" maxlength="1024" autocomplete="off"><button type="submit" id="send" disabled>发送</button></form>
+      <div class="serial-options"><label><input type="checkbox" id="serial-hex"> HEX 收发</label><label><input type="checkbox" id="newline"> 追加 CRLF</label><span id="serial-count">TX 0 · RX 0</span></div>
+    </section>
+    <details class="card debug-card"><summary>寄存器与调试 <span>单步 · 地址断点</span></summary><div id="registers" class="registers"></div><div class="debug-actions"><button id="step" disabled>执行一条指令</button><label for="breakpoint">断点</label><input id="breakpoint" placeholder="如 0030" maxlength="4"><button id="set-breakpoint">设置</button><button id="clear-breakpoint">清除</button></div><p id="breakpoint-state">未设置断点</p><p id="timer-info"></p></details>
+  </div>
+  <div class="column board-column">
+    <section class="card key-card"><div class="card-title"><h2>按键</h2><select id="key-mode" class="mini" aria-label="按键模式"><option value="matrix">矩阵按键</option><option value="independent">独立按键</option></select></div><div id="keys" class="keys"></div><div class="card-footer"><span>按住触发 · 右键锁定</span><button id="release-keys" class="text-button">全部松开</button></div></section>
+    <section class="card"><div class="card-title"><h2>LED 指示灯</h2><span>Y4 锁存 · 支持 PWM 调光</span></div><div id="leds" class="leds"></div></section>
+    <section class="card"><div class="card-title"><h2>输出状态</h2><label class="sound-toggle"><input id="sound" type="checkbox"> 开启声音</label></div><div class="outputs"><div><span id="buzzer-led" class="status-dot"></span><span>蜂鸣器</span><strong id="buzzer">关闭</strong></div><div><span id="relay-led" class="status-dot"></span><span>继电器</span><strong id="relay">释放</strong></div><div><span class="dac-symbol">∿</span><span>DAC 输出</span><strong id="dac">0.000 <small>V</small></strong></div></div></section>
+    <section class="card rtc-card"><div class="card-title"><h2>实时时钟</h2><span>DS1302</span></div><div id="rtc" class="rtc">2026-01-01 12:00:00</div><div class="card-footer"><span id="rtc-state">随仿真时间运行</span><button id="set-rtc" class="text-button">设为当前时间</button></div></section>
+    <section class="card connection-card"><div class="card-title"><h2>板级连接</h2><span>固定接线</span></div><div class="connection-row"><label for="write-mode">J13 写入方式</label><select id="write-mode"><option value="io">I/O 锁存（常用）</option><option value="bus">MOVX 总线写入</option></select></div><p>温度 P1.4 · 时钟 P1.3 / P1.7 / P2.3<br>I²C P2.0 / P2.1 · 超声波 P1.0 / P1.1</p></section>
+  </div>
+  <div class="column input-column">
+    <section class="card sensors-card"><div class="card-title"><h2>环境与模拟输入</h2><span>实时调节</span></div>
+      <div class="slider-label"><label for="temperature">温度 <small>DS18B20</small></label><output id="temperature-value">25.0 °C</output></div><input id="temperature" type="range" min="-55" max="125" step="0.5" value="25"><p class="sensor-read" id="temperature-read">芯片上电值 85 °C · 等待转换</p>
+      <div class="slider-label"><label for="analog1">光照输入 <small>AIN1</small></label><output id="analog1-value">2.50 V</output></div><input id="analog1" type="range" min="0" max="5" step="0.01" value="2.5">
+      <div class="slider-label"><label for="analog3">电位器 <small>AIN3 · RB2</small></label><output id="analog3-value">2.50 V</output></div><input id="analog3" type="range" min="0" max="5" step="0.01" value="2.5">
+      <details class="extra-input"><summary>外接通道与温度兼容设置</summary><div class="slider-label"><label for="analog0">AIN0</label><output id="analog0-value">0.00 V</output></div><input id="analog0" type="range" min="0" max="5" step="0.01" value="0"><div class="slider-label"><label for="analog2">AIN2</label><output id="analog2-value">0.00 V</output></div><input id="analog2" type="range" min="0" max="5" step="0.01" value="0"><div class="connection-row"><label for="temperature-policy">重复转换命令</label><select id="temperature-policy"><option value="hold">忙时保持（兼容）</option><option value="restart">重新计时</option></select></div><p>默认忙时保持，便于运行现有模板；重复命令行为尚未实物核对。</p></details>
+    </section>
+    <section class="card"><div class="card-title"><h2>超声波测距</h2><label><input id="echo" type="checkbox" checked> 有回波</label></div><div class="slider-label"><label for="distance">障碍物距离</label><output id="distance-value">100 cm</output></div><input id="distance" type="range" min="2" max="500" step="1" value="100"><div class="connection-row"><label for="ultrasonic-mode">发射方式</label><select id="ultrasonic-mode"><option value="board">板载 40 kHz 脉冲串</option><option value="pulse">单脉冲兼容模型</option></select></div><p id="pings">等待发射</p></section>
+    <section class="card"><div class="card-title"><h2>频率输入</h2><label><input id="frequency-enabled" type="checkbox"> 接入 P3.4 / T0</label></div><div class="slider-label"><label for="frequency">方波 <small>占空比 50%</small></label><label class="frequency-entry"><input id="frequency-number" type="number" min="100" max="38000" step="1" value="1000" aria-label="频率数值（Hz）"><span>Hz</span></label></div><input id="frequency" type="range" min="100" max="38000" step="1" value="1000"><p id="frequency-note">P3.4 用于矩阵键盘第四列；接入频率时自动断开 S16～S19</p></section>
+    <section class="card eeprom-card"><div class="card-title"><h2>EEPROM <small>AT24C02</small></h2><button id="erase-eeprom" class="text-button">清空为 FF</button></div><div id="eeprom" class="eeprom" aria-label="EEPROM 前 64 字节"></div><details><summary>查看其余 192 字节</summary><div id="eeprom-more" class="eeprom"></div></details><p id="storage-note">复位后保留 · 自动保存在本浏览器</p></section>
+  </div>
+</main>
+<footer><span>本地运行，无需开发板或后端</span><span id="diagnostic-summary">就绪</span><button id="diagnostics-button" class="text-button">运行诊断 <span id="diagnostic-count">0</span></button></footer>
+<dialog id="help-dialog"><div class="dialog-head"><h2>使用说明</h2><button data-close aria-label="关闭">×</button></div><p>在 Keil 中生成 HEX，载入后选择与下载设置一致的主频，再点击运行。固件文件只在浏览器中读取。</p><ol><li>先用“运行演示”检查数码管和按键。演示显示 2026 51，S4～S7 控制 L4～L1。</li><li>调整温度、电压、距离后，由程序自己的驱动读取。温度转换有等待时间，暂停时器件时钟也暂停。</li><li>按键支持按住、组合按键和右键锁定；独立模式仅启用 S4～S7。失焦会释放普通按键。</li><li>大模板的超声波驱动仅发出单个脉冲，需要选择“单脉冲兼容模型”。官方板载收发电路使用 40 kHz 脉冲串。</li><li>复位保留外设与 EEPROM 状态；断电重启保留 EEPROM、重置其他器件。清空 EEPROM 需要确认。</li><li>串口使用固件配置的波特率。HEX 模式填写如 4F 4B；文本模式发送 OK。</li><li>本版是功能仿真，未模拟电气噪声、模拟放大电路及全部 STC 外设。LCD 和电机接口不在范围内。</li></ol><p>资料：<a href="README.md" target="_blank">使用与兼容性说明 ↗</a> · <a href="VALIDATION.md" target="_blank">验收记录 ↗</a></p></dialog>
+<dialog id="diagnostics-dialog"><div class="dialog-head"><h2>运行诊断</h2><button data-close aria-label="关闭">×</button></div><div id="diagnostics">尚无诊断信息。</div><p>没有提示仅表示未触发当前诊断，不能据此保证全部固件功能兼容。</p></dialog>
+<div id="drop-zone" hidden>释放 HEX 文件以载入</div>
+<script type="module" src="app.js"></script>
+</body></html>

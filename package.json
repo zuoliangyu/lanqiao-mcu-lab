@@ -1,0 +1,15 @@
+{
+  "name": "lanqiao-mcu-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "蓝桥杯单片机 CT107D / STC15F2K60S2 浏览器仿真实验台",
+  "scripts": {
+    "start": "node serve.cjs",
+    "check": "node --check serve.cjs && node --check tests/core.mjs && node --check tests/firmware.mjs && node --check tests/helpers.mjs && node --check site/app.js && node --check site/cpu.js && node --check site/demo.js && node --check site/devices.js && node --check site/hex.js && node --check site/machine.js && node --check site/worker.js",
+    "test": "node tests/core.mjs",
+    "test:core": "node tests/core.mjs",
+    "test:firmware": "node tests/firmware.mjs"
+  }
+}

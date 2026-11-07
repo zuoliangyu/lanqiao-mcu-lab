@@ -1,0 +1,26 @@
+name: 检查
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 语法检查与核心验证
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # 无依赖、无构建；固件回归需要用户自己的 HEX，不在 CI 中运行。
+      - run: npm run check
+      - run: npm test

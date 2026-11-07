@@ -1,0 +1,6 @@
+.codegraph/
+node_modules/
+*.log
+.playwright-cli/
+*.hex
+*.zip

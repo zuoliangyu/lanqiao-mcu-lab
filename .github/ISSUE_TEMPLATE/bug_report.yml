@@ -1,0 +1,73 @@
+name: 报告问题
+description: HEX 跑不起来、外设行为和实物不一致、界面出错等
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。仿真问题几乎都和具体程序用到的外设、写法有关，信息越具体越容易复现。
+        **请不要在 issue 里贴不想公开的比赛工程源码。** 需要固件时，优先提供能复现问题的最小工程或 .hex。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 出了什么问题
+      description: 你做了什么操作，期望是什么结果（最好对照实物），实际是什么结果。
+      placeholder: |
+        载入 15 届省赛 HEX，拖动温度滑块，数码管一直显示 85.0……
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: peripherals
+    attributes:
+      label: 涉及的外设与写法
+      description: 例如 DS18B20 读温度、PCF8591 双通道、NE555 测频、矩阵键盘、Timer2 串口。
+      placeholder: Timer0 外部计数测频 + Timer1 中断扫描
+    validations:
+      required: true
+
+  - type: input
+    id: clock
+    attributes:
+      label: 主频
+      description: 页面上选择的主频，以及下载时 STC-ISP 设置的频率。
+      placeholder: 12 MHz
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器与版本
+      placeholder: Chrome 140 / Edge 140
+    validations:
+      required: true
+
+  - type: textarea
+    id: messages
+    attributes:
+      label: 页面提示
+      description: 顶部的错误提示原文，以及“运行诊断”里列出的内容。
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 同一 HEX 在实物板上行为正常（或已说明实物上的表现）
+          required: false
+        - label: 我已经搜索过现有 issue，没有重复的
+          required: true
